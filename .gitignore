@@ -1,1 +1,3 @@
-final_model.sav
+models/final_model.pkl
+data/data.db
+.ipynb_checkpoints
