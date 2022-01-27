@@ -15,10 +15,6 @@ See the packages and version numbers listed in 'requirements.txt' inside the 'ap
 
 Dealing appropriately with messages during a disaster is a challenge; there are many messages coming in at once to a limited number of people with the expertise and connections to read and respond to them appropriately, and at any given time many of the messages could be unrelated to the disaster. A good machine learning model can help workers deal with the flood of messages more efficiently by automatically determining whether they are related to the disaster and classifying them based on the category of relief required. Building such a machine learning pipeline is my goal in this project.
 
-I have about 26000 messages, collected by Figure Eight and provided by Udacity, that I can use to train and test a model. Each message may be in any number of the given categories. My goal is to have as high a recall as is feasible, i.e. for messages in that category, I want my model to predict that a high fraction of them are in the category; however, I want my predictions to be precise enough that work is reduced for the disaster response professionals, i.e. I want my model to throw out a lot of irrelevant messages in each category.
-
-There's a ton of Airbnb data available online [here](http://insideairbnb.com/get-the-data.html). I enjoy visiting Chicago and staying in Airbnbs there, and if I ever lived there I might consider listing my place on Airbnb from time to time. So, why not take a good look at the data on Chicago's listings?
-
 ## File descriptions <a name="files"></a>
 
 I have divided the files into three directories: "data", "models", and "app".
