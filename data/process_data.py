@@ -8,11 +8,24 @@
 # import libraries
 import pandas as pd
 from sqlalchemy import create_engine
-import argparse
 import sys
-from threading import Timer
 
 def load_data(messages_filepath, categories_filepath):
+    """Loads message and category data from CSV files.
+
+    Args:
+        messages_filepath -- a string that gives the path of a CSV
+            file from which to load message data.
+        categories_filepath -- a string that gives the path of a CSV
+            file from which to load category data corresponding to
+            the message data.
+    Returns:
+        messages -- a Pandas DataFrame object that contains messages
+            along with some other data for each message included
+            in the file.
+        categories -- a dataframe that gives categories for each
+            message.
+    """
     # Load the `messages` dataset
     messages = pd.read_csv(messages_filepath)
 
@@ -22,6 +35,18 @@ def load_data(messages_filepath, categories_filepath):
     return messages, categories
 
 def clean_data(messages, categories):
+    """Cleans the messages and categories data by dropping duplicates,
+        merging dataframes, and naming columns appropriately.
+    
+    Args:
+        messages -- a dataframe containing messages and some other data,
+            created using the `load_data()` function from a disaster
+            response messages file.
+        categories -- a dataframe containing the categories for each 
+            message.
+    Returns:
+        df -- a dataframe with the combined message and categories data.
+    """
     # Drop duplicate rows from `messages`
     messages.drop_duplicates(inplace=True)
 
@@ -49,7 +74,7 @@ def clean_data(messages, categories):
 
     # Split the `categories` column lists into different columns and use
     # the `cat_names` to name them
-    df_cat = pd.DataFrame(df['categories'].to_list(), index=df.index,
+    df_cat = pd.DataFrame(list(df['categories']), index=df.index,
                 columns=cat_names)
 
     # Drop the old 'categories' column from df
@@ -59,21 +84,30 @@ def clean_data(messages, categories):
 
     return df
 
-def save_data(df, database_filename, do_replace):
+def save_data(df, database_filename):
+    """Saves the data to a table in a SQLite database.
+    
+    Args:
+        df -- the dataframe to save.
+        database_filename -- the filename of the database to save
+            to; should have the extension '.db'. The data will be
+            saved to the table 'LabeledMessages' in this database.
+        
+    Returns:
+        None.
+    """
     # Create SQLAlchemy engine and a SQLite database
     engine = create_engine(f'sqlite:///{database_filename}')
     # Write the dataframe to a table in the database and
     # name the table LabeledMessages.
-
-    if do_replace:
-        df.to_sql('LabeledMessages', engine, index=False, if_exists='replace')
-    else:
-        df.to_sql('LabeledMessages', engine, index=False, if_exists='append')
+    df.to_sql('LabeledMessages', engine, index=False, if_exists='replace')
 
 def main():
-    if len(sys.argv) == 5:
+    """Executes the ETL pipeline. Loads data from two CSV files, cleans and 
+    combines the data into one dataframe, and saves it to a SQLite database."""
+    if len(sys.argv) == 4:
 
-        messages_filepath, categories_filepath, database_filepath, do_replace = sys.argv[1:]
+        messages_filepath, categories_filepath, database_filepath = sys.argv[1:]
 
         print('Loading data...')
         print(f'Messages: {messages_filepath}')
@@ -83,13 +117,9 @@ def main():
         print('Cleaning data...')
         df = clean_data(messages, categories)
         
-        if do_replace == 'r':
-            do_replace = True
-        else:
-            do_replace = False
         print('Saving data...')
         print(f'Database: {database_filepath}')
-        save_data(df, database_filepath, do_replace)
+        save_data(df, database_filepath)
         
         print('Data has been saved to the database')
     
@@ -97,11 +127,10 @@ def main():
         print_str = 'Provide the filepaths of the messages and categories '
         print_str += 'datasets as the first and second arguments, respectively, '
         print_str += 'as well as the filepath of the database where you want '
-        print_str += 'to save your cleaned data. For the last argument, type \'r\' '
-        print_str += 'if you want to replace the database, and any other character, '
-        print_str += 'such as \'a\' if you want to append to it.'
-        print_str += '\n\nExample: python etl_pipeline.py messages.csv categories.csv '
-        print_str += 'data.db r'
+        print_str += 'to save your cleaned data.'
+        print_str += '\n\nExample: python data/process_data.py data/messages.csv '
+        print_str += 'data/categories.csv data/data.db'
+        print_str += '\n\nwhere this is run from the top-level directory (one above this script)'
         print(print_str)
 
 if __name__ == '__main__':
