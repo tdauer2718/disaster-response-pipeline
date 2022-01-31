@@ -5,7 +5,7 @@
 
 ### Import libraries and load data ###
 
-# import libraries
+# import libraries``
 import pandas as pd
 from sqlalchemy import create_engine
 import sys
@@ -47,40 +47,72 @@ def clean_data(messages, categories):
     Returns:
         df -- a dataframe with the combined message and categories data.
     """
+    ### Drop duplicate rows###
+
     # Drop duplicate rows from `messages`
     messages.drop_duplicates(inplace=True)
 
     # Drop duplicate rows from `categories`
     categories.drop_duplicates(inplace=True)
-
-    # Join the dataframes on their common ids
-    df = messages.merge(categories, how='inner', on='id')
+    
+    # In my Jupyter notebook ("ETL Pipeline Preparation.ipynb") I 
+    # found that a few dozen messages have more than one corresponding
+    # row in the `categories` dataframe - a data labeling mistake, so
+    # I'll remove these messages.
+    # Find the ids of messages to remove:
+    ids_to_remove = categories[categories['id'].duplicated(keep=False)]['id']
+    # Drop the appropriate rows from `categories` and `messages`
+    categories.drop(categories[categories['id'].isin(ids_to_remove)].index, inplace=True)
+    messages.drop(messages[messages['id'].isin(ids_to_remove)].index, inplace=True)
 
     ### Split the category data into separate columns ###
 
     # Split the 'categories' column on semicolons
-    df['categories'] = df['categories'].str.split(';')
+    categories['categories'] = categories['categories'].str.split(';')
 
     # Get the category names from the first row of the dataframe
-    cat_names = df['categories'].iloc[0]
-
+    cat_names = categories['categories'].iloc[0]
     # Strip the last two characters of each element to find the category names
     cat_names = [c[:-2] for c in cat_names]
 
     # Replace the 'categories' column entries with lists of the numbers alone (no text),
     # being sure to convert them from strings to integers
-    df['categories'] = df['categories'].apply(
+    categories['categories'] = categories['categories'].apply(
         lambda x: [int(s[-1]) for s in x])
 
     # Split the `categories` column lists into different columns and use
     # the `cat_names` to name them
-    df_cat = pd.DataFrame(list(df['categories']), index=df.index,
+    df_cat = pd.DataFrame(list(categories['categories']), index=categories.index,
                 columns=cat_names)
+    df_cat.head()
 
-    # Drop the old 'categories' column from df
-    df.drop(columns='categories', inplace=True)
-    # Concatenate the new columns to df
-    df = pd.concat([df, df_cat], axis=1)
+    # Drop the old 'categories' column from the `categories` dataframe
+    categories.drop(columns='categories', inplace=True)
+    # Concatenate the new columns to `categories`
+    categories = pd.concat([categories, df_cat], axis=1)
+
+    ### Join the dataframes ###
+
+    # Join the dataframes on their common ids
+    df = messages.merge(categories, how='inner', on='id')
+
+    ### Prepare for binary classification ###
+
+    # Figure out which category columns (which have column names in 
+    # `cat_names`) have some label that's not in {0, 1}
+    cols = []
+    for c in cat_names:
+        unique_vals = set(df[c].unique())
+        if not unique_vals.issubset({0, 1}):
+            cols.append(c)
+            print(f'Values in \'{c}\' column: {unique_vals}')
+
+    # Drop the rows that have values not in {0, 1} for any of the categories
+    # Find the indices of rows to drop
+    for c in cols:
+        to_drop = df[~df[c].isin({0, 1})].index
+    # Drop the rows
+    df.drop(to_drop, inplace=True)
 
     return df
 

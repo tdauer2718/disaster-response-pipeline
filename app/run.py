@@ -64,7 +64,7 @@ def index():
             ],
 
             'layout': {
-                'title': 'Distribution of message genres',
+                'title': "Distribution of message genres",
                 'yaxis': {
                     'title': "Count"
                 },
@@ -82,9 +82,9 @@ def index():
             ],
 
             'layout': {
-                'title': 'Fraction of messages in each category',
+                'title': "Fraction of messages in each category",
                 'yaxis': {
-                    'title': "Count"
+                    'title': "Number of categories"
                 },
                 'xaxis': {
                     'title': "Fraction"

@@ -25,8 +25,7 @@ from nltk.stem import WordNetLemmatizer
 from nltk.corpus import stopwords
 
 def load_data(database_filepath):
-    '''Loads data from a database and splits it into features and targets
-        after some processing.
+    '''Loads data from a database and splits it into features and targets.
 
         Args:
             datbase_filepath -- a string that gives the filepath for the database
@@ -47,48 +46,27 @@ def load_data(database_filepath):
     # Create the dataframe of targets (each column is a target/category)
     Y = df.drop(columns=['id', 'message', 'original', 'genre'])
 
-    # Figure out which columns have more or fewer than 2 labels
-    # I want each target to be binary
-    cols = Y.columns[np.where(Y.nunique() != 2)[0]]
-    # Make a list to store the number of unique values in 
-    # columns with != 2 unique values
-    n_vals_list = []
-    for i, c in enumerate(cols):
-        # Put the correct values in the list
-        n_vals = Y.nunique()[c]
-        n_vals_list.append(n_vals)
-    # Drop the appropriate rows and columns so that all targets are binary
-    for i, c in enumerate(cols):
-        n_vals = n_vals_list[i]
-        if n_vals > 2:
-            to_drop = Y[(Y[c] != 0) & (Y[c] != 1)].index
-            # Drop all rows that have label not in {0, 1}
-            X.drop(to_drop, inplace=True)
-            Y.drop(to_drop, inplace=True)
-        if n_vals < 2:
-            # Drop columns from Y that don't have more than one label
-            Y.drop(columns=c, inplace=True)
-
-    # The following is a bit annoying (not as efficient as I'd like), 
-    # but I need to get rid of rows my CountVectorizer can't work with
-    # (these rows have messages that are stripped all the way down to
-    # whitespace by my vectorizer, meaning they are just made up of
-    # special characters/whitespace, and so they were likely left in by
-    # mistake and wouldn't be useful for the disaster response team anyway).
+    # Some of the messages become the empty string after applying the 
+    # tokenizer and removing stopwords; these will cause an error when using 
+    # `CountVectorizer`. I will therefore check for such messages explicitly 
+    # and remove the corresponding rows. I'll do this by making each message 
+    # into a set of tokenized words, subtracting the set of stopwords 
+    # (subtracting as sets is faster than using a list-based approach), 
+    # and then seeing if the result is the empty set. Alternatively, I could use 
+    # `try`-`except` to see on which rows the `CountVectorizer` with my 
+    # tokenizer and stop words fails, but that approach is rather wasteful 
+    # since I don't need to do vectorization on rows that don't return the 
+    # empty set after tokenization and stopword removal.
     # Define some stopwords:
-    my_stopwords = list(set([tokenize(w)[0] for w in stopwords.words('english')]))
-    # Create a CountVectorizer object using my tokenizer function and the stopwords
-    vect = CountVectorizer(tokenizer=tokenize, stop_words=my_stopwords)
-    # Make a list of row indices for which the vectorizer fails
-    failed_is = []
-    for i in X.index:
-        try:
-            vect.fit([X.loc[i]])
-        except:
-            failed_is.append(i)
-    # Drop the appropriate rows
-    X.drop(failed_is, inplace=True)
-    Y.drop(failed_is, inplace=True)
+    my_stopwords = set([tokenize(w)[0] for w in stopwords.words('english')])
+    # Compute the result after tokenization and stopword removal on the messages
+    X_check = X.apply(lambda x: set(tokenize(x)) - my_stopwords)
+    # Find the resulting rows
+    failed_rows = X_check[X_check == set()].index
+    # Drop the appropriate row(s)
+    X.drop(failed_rows, inplace=True)
+    Y.drop(failed_rows, inplace=True)
+    
 
     # I want to save the class ratio, which here I define as the fraction of all
     # instances that are in Class 1, for each column for this cleaned data, for later. 
@@ -187,10 +165,19 @@ def evaluate_model(model, X_test, Y_test):
         print(f'\033[1m{col}:\033[0m')
         report = classification_report(Y_test[col], Y_pred[:, i], 
                                     zero_division=0, output_dict=True)
-        recall = report['1']['recall']
-        precision = report['1']['precision']
-        f1 = report['1']['f1-score']
-        frac = report['1']['support']/(report['0']['support'] + report['1']['support'])
+        if '0' not in report.keys():
+            # In this case there are no instances in Class 0
+            n_class_0 = 0
+        else:
+            n_class_0 = report['0']['support']
+        try:
+            recall = report['1']['recall']
+            precision = report['1']['precision']
+            f1 = report['1']['f1-score']
+            frac = report['1']['support']/(n_class_0 + report['1']['support'])
+        except KeyError:
+            # In this case there are no instances in Class 1
+            recall, precision, f1, frac = 0, 0, 0, 0
         print_str = f'F1-score = {f1:.3g}; recall = {recall:.3g}; '
         print_str += f'precision = {precision:.3g}; class_1_fraction = {frac:.3g}'
         print(print_str)
